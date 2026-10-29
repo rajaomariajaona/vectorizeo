@@ -1,0 +1,35 @@
+name: Deploy web
+
+# Push a tag such as v0.1.0 to build the web GUI and publish it to Cloudflare Pages.
+# Needs the repository secrets CLOUDFLARE_API_TOKEN (permission: Cloudflare Pages - Edit)
+# and CLOUDFLARE_ACCOUNT_ID.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-web
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: trunk
+      - name: Build the web app
+        run: trunk build --release
+        working-directory: crates/vectorizeo-gui
+      - name: Publish to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy crates/vectorizeo-gui/dist --project-name vectorizeo

@@ -27,10 +27,6 @@ web:
 web-build:
     cd crates/vectorizeo-gui && trunk build --release
 
-# Build the web app and upload it to Cloudflare Pages (first time: npx wrangler login)
-deploy project="vectorizeo": web-build
-    npx --yes wrangler pages deploy crates/vectorizeo-gui/dist --project-name {{project}} --commit-dirty=true
-
 # Install what the web build needs
 web-setup:
     rustup target add wasm32-unknown-unknown
