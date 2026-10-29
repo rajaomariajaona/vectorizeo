@@ -12,11 +12,14 @@ use crate::theme::{self, Tokens};
 const MIN_ZOOM: f32 = 0.05;
 const MAX_ZOOM: f32 = 64.0;
 
-/// The primary button for an edit tool, in image pixel coordinates.
+/// The pointer in image pixel coordinates: the primary button for an edit tool, or hover and
+/// clicks without one.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Pointer {
-    /// Pointer position (may lie outside the image).
+    /// Pointer position (may lie outside the image); without a tool only while over the canvas.
     pub pos: Option<[f64; 2]>,
+    /// Clicked without dragging (no tool active).
+    pub clicked: bool,
     /// Pressed on the canvas this frame.
     pub pressed: bool,
     /// Held since a press on the canvas.
@@ -138,20 +141,21 @@ impl Canvas {
 
         let image = Rect::from_center_size(rect.center() + self.pan, self.size * self.zoom);
         self.image_rect = image;
-        let mut pointer = Pointer::default();
-        if tool {
+        let to_image = |p: Pos2| {
+            let q = (p - image.min) / self.zoom;
+            [f64::from(q.x), f64::from(q.y)]
+        };
+        let pointer = if tool {
             let pressed = primary_pressed && response.hovered();
             if pressed {
                 self.tool_drag = true;
             }
-            pointer = Pointer {
-                pos: latest.map(|p| {
-                    let q = (p - image.min) / self.zoom;
-                    [f64::from(q.x), f64::from(q.y)]
-                }),
+            let pointer = Pointer {
+                pos: latest.map(to_image),
                 pressed,
                 down: self.tool_drag && primary_down,
                 released: self.tool_drag && !primary_down,
+                clicked: false,
             };
             if !primary_down {
                 self.tool_drag = false;
@@ -159,9 +163,15 @@ impl Canvas {
             if response.hovered() {
                 ui.ctx().set_cursor_icon(CursorIcon::Crosshair);
             }
+            pointer
         } else {
             self.tool_drag = false;
-        }
+            Pointer {
+                pos: response.hover_pos().map(to_image),
+                clicked: response.clicked() && !shift,
+                ..Pointer::default()
+            }
+        };
         let split_x = rect.left() + self.split * rect.width();
         let handle = before.map(|_| {
             let r = Rect::from_x_y_ranges(split_x - 8.0..=split_x + 8.0, rect.y_range());

@@ -290,23 +290,18 @@ impl SegEditor {
     }
 }
 
-/// Remove Background state (hidden-segment flags plus undo and redo lists): segments that are not exported.
+/// Remove Background: shapes left out of the export. Each click is kept as the point it hit and
+/// whether it removed or restored the shape there, so the choice survives a new trace: the shape
+/// under each point is looked up again ([`Background::resolve`]).
 #[derive(Clone, Debug, Default)]
 pub struct Background {
     hidden: Vec<bool>,
-    undo: Vec<usize>,
-    redo: Vec<usize>,
+    undo: Vec<([f64; 2], bool)>,
+    redo: Vec<([f64; 2], bool)>,
     revision: u64,
 }
 
 impl Background {
-    /// A fresh state for `segments` segments (also used after every vectorization:
-    /// resize and revert). The old history is dropped (its redo would replay stale segment
-    /// indices).
-    pub fn new(segments: usize) -> Self {
-        Self { hidden: vec![false; segments], ..Self::default() }
-    }
-
     pub fn hidden(&self) -> &[bool] {
         &self.hidden
     }
@@ -315,6 +310,7 @@ impl Background {
         self.hidden.get(s).copied().unwrap_or(false)
     }
 
+    /// Changes whenever the hidden shapes may have.
     pub fn revision(&self) -> u64 {
         self.revision
     }
@@ -324,51 +320,38 @@ impl Background {
         !self.undo.is_empty()
     }
 
-    pub fn can_undo(&self) -> bool {
-        !self.undo.is_empty()
-    }
-
-    pub fn can_redo(&self) -> bool {
-        !self.redo.is_empty()
-    }
-
-    fn flip(&mut self, s: usize) {
-        if let Some(h) = self.hidden.get_mut(s) {
-            *h = !*h;
-        }
-        self.revision += 1;
-    }
-
-    /// A click removes the shape or restores a removed one.
-    pub fn toggle(&mut self, s: usize) {
-        self.flip(s);
-        self.undo.push(s);
+    /// Remove (`remove`) or restore the shape at `p`.
+    pub fn apply(&mut self, p: [f64; 2], remove: bool) {
+        self.undo.push((p, remove));
         self.redo.clear();
     }
 
-    ///.
-    pub fn undo(&mut self) {
-        if let Some(s) = self.undo.pop() {
-            self.flip(s);
-            self.redo.push(s);
-        }
+    pub fn undo(&mut self) -> bool {
+        let Some(op) = self.undo.pop() else { return false };
+        self.redo.push(op);
+        true
     }
 
-    ///.
-    pub fn redo(&mut self) {
-        if let Some(s) = self.redo.pop() {
-            self.flip(s);
-            self.undo.push(s);
-        }
+    pub fn redo(&mut self) -> bool {
+        let Some(op) = self.redo.pop() else { return false };
+        self.undo.push(op);
+        true
     }
 
     /// Nothing removed; the redo list becomes the history in order.
     pub fn revert(&mut self) {
-        if self.undo.is_empty() {
-            return;
+        self.redo.extend(std::mem::take(&mut self.undo).into_iter().rev());
+    }
+
+    /// Replay the history on a result with `segments` shapes; `shape_at` finds the shape under a
+    /// point (points that miss every shape are skipped).
+    pub fn resolve(&mut self, segments: usize, shape_at: impl Fn([f64; 2]) -> Option<usize>) {
+        self.hidden = vec![false; segments];
+        for &(p, remove) in &self.undo {
+            if let Some(s) = shape_at(p).filter(|&s| s < segments) {
+                self.hidden[s] = remove;
+            }
         }
-        self.hidden.iter_mut().for_each(|h| *h = false);
-        self.redo = std::mem::take(&mut self.undo).into_iter().rev().collect();
         self.revision += 1;
     }
 }
@@ -445,19 +428,26 @@ mod tests {
         assert_eq!(**e.image(), vec![G, G]);
     }
 
+    /// Points pick the shapes on every replay; restoring and undo/redo/revert follow the history.
     #[test]
-    fn background_toggle_undo_revert() {
-        let mut b = Background::new(3);
-        b.toggle(1);
-        b.toggle(2);
-        b.toggle(1);
+    fn background_history_replays_on_points() {
+        let mut b = Background::default();
+        // Shapes: x < 1 is shape 0, x < 2 shape 1, else shape 2.
+        let at = |p: [f64; 2]| Some(p[0] as usize);
+        b.apply([1.5, 0.0], true);
+        b.apply([2.5, 0.0], true);
+        b.apply([1.2, 0.0], false);
+        b.resolve(3, at);
         assert_eq!(b.hidden(), &[false, false, true]);
-        b.undo();
+        assert!(b.undo());
+        b.resolve(3, at);
         assert_eq!(b.hidden(), &[false, true, true]);
         b.revert();
+        b.resolve(3, at);
         assert_eq!(b.hidden(), &[false, false, false]);
-        b.redo();
-        b.redo();
-        assert_eq!(b.hidden(), &[false, true, true]);
+        assert!(b.redo() && b.redo());
+        // Another trace: the same points land on other shapes.
+        b.resolve(2, |p| Some((p[0] as usize).min(1)));
+        assert_eq!(b.hidden(), &[false, true]);
     }
 }

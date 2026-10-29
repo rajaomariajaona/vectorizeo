@@ -266,7 +266,7 @@ impl App {
         self.preview = None;
         self.pending_preview = None;
         self.confirm = None;
-        self.edit.color = None;
+        self.edit.reset();
         self.doc = Some(Document {
             path: l.path,
             original,
@@ -451,22 +451,24 @@ impl App {
             return;
         }
         let Some(doc) = &mut self.doc else { return };
+        // E: paint pixels, in the Segments view.
         if ctx.input(|i| i.modifiers.is_none() && i.key_pressed(Key::E)) {
-            self.edit.on = !self.edit.on;
+            self.edit.paint = !(self.edit.paint && self.view == View::Segments);
+            self.view = View::Segments;
         }
-        let (used, changed) = self.edit.keys(ctx, self.view, &mut doc.session);
+        let changed = self.edit.keys(ctx, self.view, &mut doc.session);
         if changed {
             self.changed_at = Some(Instant::now());
             self.paused = false;
         }
         ctx.input(|i| {
-            if i.key_pressed(Key::F) && !used {
+            if i.key_pressed(Key::F) && i.modifiers.is_none() {
                 self.canvas.fit();
             }
             if i.key_pressed(Key::Num1) {
                 self.canvas.actual_size(ctx);
             }
-            if i.key_pressed(Key::C) && !used {
+            if i.key_pressed(Key::C) && i.modifiers.is_none() {
                 self.set_compare(!self.compare);
             }
             for (key, view) in [(Key::I, View::Input), (Key::S, View::Segments), (Key::R, View::Result)] {
@@ -685,9 +687,6 @@ impl App {
                         theme_switch(ui);
                         ui.separator();
                         ui.add_enabled_ui(self.doc.is_some(), |ui| {
-                            ui.toggle_value(&mut self.edit.on, "Edit").on_hover_text(
-                                "Edit the segmentation (Segments view) or remove background shapes (Result view) (E)",
-                            );
                             let mut compare = self.compare;
                             if ui
                                 .toggle_value(&mut compare, "Compare")
@@ -729,7 +728,12 @@ impl App {
         for (i, (step, label, tip)) in [
             (Step::Open, "Open", "Open or drop an image (Ctrl+O)"),
             (Step::Adjust, "Adjust", "Pick the image type, detail level and colours in the panel on the right"),
-            (Step::Review, "Review", "Check the result (R); Compare (C) puts the input next to it"),
+            (
+                Step::Review,
+                "Review",
+                "Check the result (R) and click a shape to remove, recolour or merge it; Compare (C) puts the \
+                 input next to it",
+            ),
             (Step::Export, "Export", "Save the result as SVG or EPS (Ctrl+S)"),
         ]
         .into_iter()
@@ -770,7 +774,7 @@ impl App {
                 &[
                     ("Ctrl+O", "Open an image"),
                     ("Ctrl+S", "Export the result"),
-                    ("Esc", "Cancel the running step"),
+                    ("Esc", "Cancel the running step; close the shape menu"),
                     ("? or F1", "Show these shortcuts"),
                 ],
             ),
@@ -781,18 +785,17 @@ impl App {
                     ("C", "Compare with the input"),
                     ("F", "Fit to window (also double-click)"),
                     ("1", "Actual pixels"),
-                    ("E", "Edit mode"),
                 ],
             ),
             (
-                "Edit mode",
+                "Edit",
                 &[
-                    ("Z / Y / T", "Undo, redo, revert"),
-                    ("A", "Pan (hold Shift to pan for a moment)"),
-                    ("D", "Zap a segment / remove a shape"),
-                    ("F", "Fill"),
-                    ("X", "Pencil"),
-                    ("C", "Pick a colour"),
+                    ("Click", "Shape menu in the Result view: remove, recolour, merge"),
+                    ("Ctrl+Z", "Undo"),
+                    ("Ctrl+Shift+Z", "Redo (also Ctrl+Y)"),
+                    ("E", "Paint pixels in the Segments view"),
+                    ("B / G / M / K", "Pencil, fill, merge, pick a colour"),
+                    ("Shift", "Pan for a moment while painting"),
                 ],
             ),
         ];
@@ -996,8 +999,8 @@ impl App {
             {
                 crate::edit::draw_removed(ui, rect, &self.canvas, lines);
             }
-            let mut changed = tool && self.edit.pointer(self.view, pointer, &mut doc.session);
-            changed |= self.edit.toolbar(ui, rect, self.view, &mut doc.session);
+            let mut changed = ready && self.edit.pointer(self.view, pointer, &mut doc.session);
+            changed |= self.edit.overlay(ui, rect, self.view, &self.canvas, &mut doc.session);
             if changed {
                 self.changed_at = Some(Instant::now());
                 self.paused = false;

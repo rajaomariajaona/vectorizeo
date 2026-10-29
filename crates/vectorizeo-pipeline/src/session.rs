@@ -17,7 +17,7 @@ use vectorizeo_core::stages::palette::{FoundPalette, PaletteParams, find_palette
 use vectorizeo_core::stages::preprocess::{preprocess, shrink_for_analysis};
 use vectorizeo_core::stages::segmenter::{Segmentation, segmentation_from_colors};
 
-use crate::edit::{Background, SegEditor, zap_reference};
+use crate::edit::{Action, Background, SegEditor, zap_reference};
 use crate::{Flatten, Vectorized, fit, flatten, palette_params, segment_with, trace_smooth};
 
 /// A GUI progress stage (the label of each worker task).
@@ -342,6 +342,15 @@ impl Job {
     }
 }
 
+/// What an undo step of the shared edit history changes.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum EditKind {
+    /// The segmentation colours (pencil, fill, merge).
+    Segments,
+    /// The removed shapes.
+    Shapes,
+}
+
 /// One loaded image, its settings and the latest result of every stage.
 pub struct Session {
     /// Premultiplied, as the engine loads it.
@@ -354,8 +363,11 @@ pub struct Session {
     result: Option<Arc<VecRun>>,
     /// Edit Segmentation, on the segmentation it was fetched from.
     seg_edit: Option<(Arc<SegRun>, SegEditor)>,
-    /// Remove Background, for `result`.
+    /// Remove Background, resolved on `result`.
     background: Background,
+    /// The order of the edits in both lists, for one undo history; `undone` is the redo stack.
+    history: Vec<EditKind>,
+    undone: Vec<EditKind>,
 }
 
 impl Session {
@@ -372,6 +384,8 @@ impl Session {
             result: None,
             seg_edit: None,
             background: Background::default(),
+            history: Vec::new(),
+            undone: Vec::new(),
         }
     }
 
@@ -408,14 +422,132 @@ impl Session {
 
     /// The segmentation editor, fetched from the current segmentation if it is not open on it
     /// (a new segmentation replaces the edits).
-    pub fn seg_editor_mut(&mut self) -> Option<&mut SegEditor> {
+    fn seg_editor_mut(&mut self) -> Option<&mut SegEditor> {
         let cur = self.segmentation()?.clone();
         if !self.seg_edit.as_ref().is_some_and(|(s, _)| Arc::ptr_eq(s, &cur)) {
             let reference = zap_reference(&self.loaded, cur.key.flatten);
             let editor = SegEditor::new(&cur.seg, reference);
             self.seg_edit = Some((cur, editor));
+            self.forget(EditKind::Segments);
         }
         self.seg_edit.as_mut().map(|(_, e)| e)
+    }
+
+    /// The segmentation colour at a pixel, edits included.
+    pub fn color_at(&self, x: i32, y: i32) -> Option<[u8; 4]> {
+        if let Some(e) = self.seg_editor() {
+            return e.color_at(x, y);
+        }
+        let seg = &self.segmentation()?.seg;
+        let inside = x >= 0 && y >= 0 && (x as usize) < seg.width && (y as usize) < seg.height;
+        inside.then(|| seg.segment_color(seg.labels[y as usize * seg.width + x as usize] as usize))
+    }
+
+    /// Drop one kind of edit from the shared history (its list was replaced).
+    fn forget(&mut self, kind: EditKind) {
+        self.history.retain(|&k| k != kind);
+        self.undone.retain(|&k| k != kind);
+    }
+
+    fn record(&mut self, kind: EditKind) {
+        self.history.push(kind);
+        self.undone.clear();
+    }
+
+    /// Paint, fill or merge on the segmentation colours; the result is traced again. Returns
+    /// whether anything changed.
+    pub fn edit_segments(&mut self, a: Action) -> bool {
+        let changed = self.seg_editor_mut().is_some_and(|e| e.apply(a));
+        if changed {
+            self.record(EditKind::Segments);
+        }
+        changed
+    }
+
+    /// The shape of the current result under an image point.
+    pub fn shape_at(&self, p: [f64; 2]) -> Option<usize> {
+        let r = self.result()?;
+        r.v.graph.shape_at(&r.seg.seg.labels, p[0], p[1])
+    }
+
+    /// Remove the shape under `p` from the export, or restore it. Returns whether it changed.
+    pub fn set_shape_removed(&mut self, p: [f64; 2], remove: bool) -> bool {
+        let Some(s) = self.shape_at(p) else { return false };
+        if self.background.is_hidden(s) == remove {
+            return false;
+        }
+        self.background.apply(p, remove);
+        self.record(EditKind::Shapes);
+        self.resolve_background();
+        true
+    }
+
+    /// Look up the removed shapes on the latest result.
+    fn resolve_background(&mut self) {
+        let Some(r) = &self.result else { return };
+        let (graph, labels) = (&r.v.graph, &r.seg.seg.labels);
+        self.background.resolve(r.v.colors.len(), |p| graph.shape_at(labels, p[0], p[1]));
+    }
+
+    pub fn can_undo(&self) -> bool {
+        !self.history.is_empty()
+    }
+
+    pub fn can_redo(&self) -> bool {
+        !self.undone.is_empty()
+    }
+
+    pub fn has_edits(&self) -> bool {
+        self.can_undo()
+    }
+
+    /// Undo the last edit of either kind. Returns whether anything changed.
+    pub fn undo(&mut self) -> bool {
+        let Some(kind) = self.history.pop() else { return false };
+        self.undone.push(kind);
+        match kind {
+            EditKind::Segments => {
+                if let Some(e) = self.seg_editor_mut() {
+                    e.undo();
+                }
+            }
+            EditKind::Shapes => {
+                self.background.undo();
+                self.resolve_background();
+            }
+        }
+        true
+    }
+
+    pub fn redo(&mut self) -> bool {
+        let Some(kind) = self.undone.pop() else { return false };
+        self.history.push(kind);
+        match kind {
+            EditKind::Segments => {
+                if let Some(e) = self.seg_editor_mut() {
+                    e.redo();
+                }
+            }
+            EditKind::Shapes => {
+                self.background.redo();
+                self.resolve_background();
+            }
+        }
+        true
+    }
+
+    /// Back to no edits; every edit (undone ones after the rest) can be redone in order.
+    pub fn revert(&mut self) -> bool {
+        if self.history.is_empty() {
+            return false;
+        }
+        if let Some(e) = self.seg_editor_mut() {
+            e.revert();
+        }
+        self.background.revert();
+        self.resolve_background();
+        self.undone.extend(std::mem::take(&mut self.history).into_iter().rev());
+        true
     }
 
     /// Whether the current settings need a new segmentation although the last one has manual
@@ -427,15 +559,12 @@ impl Session {
 
     pub fn discard_seg_edits(&mut self) {
         self.seg_edit = None;
+        self.forget(EditKind::Segments);
     }
 
     /// Remove Background state of the current result.
     pub fn background(&self) -> &Background {
         &self.background
-    }
-
-    pub fn background_mut(&mut self) -> &mut Background {
-        &mut self.background
     }
 
     /// The segmentation for the current settings, if done.
@@ -483,9 +612,9 @@ impl Session {
             Done::Palettes(p) => self.palettes = Some(p),
             Done::Segment(s) => self.seg = Some(s),
             Done::Vectorize(r) => {
-                // Every finished vectorization resets Remove Background.
-                self.background = Background::new(r.v.colors.len());
+                // The removed shapes are looked up again on the new shapes.
                 self.result = Some(r);
+                self.resolve_background();
             }
         }
     }
@@ -628,8 +757,9 @@ mod tests {
         assert!(s.svg().unwrap().contains(&red));
 
         // Paint the red square white: one segment fewer.
-        let white = s.seg_editor_mut().unwrap().color_at(0, 0).unwrap();
-        assert!(s.seg_editor_mut().unwrap().apply(Action::Fill { x: 30, y: 10, color: white }));
+        let white = s.color_at(0, 0).unwrap();
+        let red_seg = s.color_at(30, 10).unwrap();
+        assert!(s.edit_segments(Action::Fill { x: 30, y: 10, color: white }));
         assert!(matches!(s.next_job(Target::Result), Some(Job::Vectorize { edit: Some(_), .. })));
         s.ensure(Target::Result, &mut |_| {});
         let after = s.result().unwrap().clone();
@@ -637,21 +767,33 @@ mod tests {
         assert!(!s.svg().unwrap().contains(&red));
 
         // Undo everything: back to the unedited segmentation's key.
-        s.seg_editor_mut().unwrap().undo();
+        assert!(s.undo());
         assert_eq!(s.vec_key().unwrap(), before.key);
         assert!(!s.settings_discard_edits());
-        s.seg_editor_mut().unwrap().redo();
+        assert!(s.redo());
         s.settings.flatten = Flatten::from_hex("000000").unwrap();
         assert!(s.settings_discard_edits());
         s.settings.flatten = Flatten::WHITE;
 
         // Remove the disc.
         s.ensure(Target::Result, &mut |_| {});
-        let r = s.result().unwrap().clone();
-        let disc = r.v.graph.shape_at(&r.seg.seg.labels, 14.5, 16.5).unwrap();
         let svg = s.svg().unwrap();
-        s.background_mut().toggle(disc);
+        assert!(s.set_shape_removed([14.5, 16.5], true));
+        assert!(!s.set_shape_removed([14.5, 16.5], true), "already removed");
         let removed = s.svg().unwrap();
         assert_eq!(removed.matches("<path").count() + 1, svg.matches("<path").count());
+
+        assert!(s.undo());
+        assert!(s.background().hidden().iter().all(|&h| !h), "removal undone");
+        assert!(s.redo());
+
+        // Painting the square red again traces again: the disc stays removed.
+        assert!(s.edit_segments(Action::Fill { x: 30, y: 10, color: red_seg }));
+        s.ensure(Target::Result, &mut |_| {});
+        assert!(s.svg().unwrap().contains(&red));
+        let disc = s.shape_at([14.5, 16.5]).unwrap();
+        assert!(s.background().is_hidden(disc));
+        assert!(s.revert() && !s.can_undo() && s.can_redo());
+        assert!(s.background().hidden().iter().all(|&h| !h));
     }
 }
