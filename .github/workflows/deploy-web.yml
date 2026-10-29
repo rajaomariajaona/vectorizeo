@@ -16,6 +16,19 @@ jobs:
   deploy:
     runs-on: ubuntu-22.04
     steps:
+      - name: Check the Cloudflare secrets are set
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          missing=0
+          for name in CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID; do
+            if [ -z "${!name}" ]; then
+              echo "::error::The repository secret $name is empty or missing (Settings > Secrets and variables > Actions > Secrets)."
+              missing=1
+            fi
+          done
+          exit $missing
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
         with:

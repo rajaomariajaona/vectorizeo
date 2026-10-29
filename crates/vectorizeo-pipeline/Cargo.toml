@@ -2,6 +2,7 @@
 name = "vectorizeo-pipeline"
 version = "0.1.0"
 edition = "2024"
+license = "GPL-3.0-or-later"
 description = "Pipeline steps and GUI-flow state shared by the vectorizeo CLI, wizard and GUI"
 
 [dependencies]
