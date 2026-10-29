@@ -1,0 +1,12 @@
+[package]
+name = "vectorizeo-core"
+version = "0.1.0"
+edition = "2024"
+description = "Bitmap-to-vector tracing engine"
+
+[dependencies]
+serde = { version = "1", features = ["derive"], optional = true }
+
+[features]
+# Serialize the stage inputs and results (the web GUI sends them to a Web Worker).
+serde = ["dep:serde"]
