@@ -2,6 +2,9 @@
 //! (classify, palette, segmentation, smoothing, export) in one window with a canvas and a settings
 //! panel. The web build is made with trunk (`index.html` next to this crate's `Cargo.toml`).
 
+// No console window behind the GUI on Windows release builds.
+#![cfg_attr(all(not(debug_assertions), windows), windows_subsystem = "windows")]
+
 mod app;
 mod canvas;
 mod edit;

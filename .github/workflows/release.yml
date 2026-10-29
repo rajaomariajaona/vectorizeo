@@ -1,0 +1,96 @@
+name: Release
+
+# Push a tag such as v0.1.0 to build the portable Linux and Windows packages
+# and publish them as a GitHub release.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-22.04 # oldest runner image: keeps the glibc requirement low
+            target: x86_64-unknown-linux-gnu
+            name: vectorizeo-x86_64-linux
+            archive: tar.gz
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            name: vectorizeo-x86_64-windows
+            archive: zip
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
+      - name: Linux build dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libxkbcommon-dev libwayland-dev libx11-dev libxcursor-dev libxrandr-dev libxi-dev libgl1-mesa-dev
+      - name: Check the tag matches the crate version
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        run: |
+          version=$(grep -m1 '^version' crates/vectorizeo-cli/Cargo.toml | cut -d'"' -f2)
+          [ "v$version" = "${GITHUB_REF_NAME}" ] || { echo "tag ${GITHUB_REF_NAME} != crate version v$version"; exit 1; }
+      - name: Build
+        shell: bash
+        env:
+          # Windows: link the C runtime statically so the zip runs without the VC++ redistributable.
+          RUSTFLAGS: ${{ runner.os == 'Windows' && '-C target-feature=+crt-static' || '' }}
+        run: cargo build --release --locked --target ${{ matrix.target }} -p vectorizeo -p vectorizeo-gui --bin vectorizeo --bin vectorizeo-gui
+      - name: Package
+        shell: bash
+        run: |
+          out="target/${{ matrix.target }}/release"
+          pkg="${{ matrix.name }}"
+          mkdir -p "dist/$pkg"
+          if [ "${{ runner.os }}" = "Windows" ]; then ext=.exe; else ext=; fi
+          cp "$out/vectorizeo$ext" "$out/vectorizeo-gui$ext" "dist/$pkg/"
+          cp README.md "dist/$pkg/"
+          cp assets/logo.svg "dist/$pkg/vectorizeo.svg"
+          cd dist
+          if [ "${{ matrix.archive }}" = "zip" ]; then
+            7z a -tzip "$pkg.zip" "$pkg" > /dev/null
+          else
+            tar -czf "$pkg.tar.gz" "$pkg"
+          fi
+          rm -rf "$pkg"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.name }}
+          path: dist/*
+
+  publish:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Checksums
+        run: cd dist && sha256sum * > SHA256SUMS
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" dist/* \
+            --title "Vectorizeo ${GITHUB_REF_NAME#v}" \
+            --generate-notes

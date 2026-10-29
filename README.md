@@ -26,6 +26,20 @@ Vectorizeo turns bitmap images (PNG, JPEG, BMP, GIF, TIFF) into clean vector gra
 | `vectorizeo-cli` | the `vectorizeo` command (`trace`, `segment`, `palette`, `interactive`) |
 | `vectorizeo-gui` | desktop and web GUI built with egui |
 
+## Install
+
+**Linux** (x86_64):
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/rajaomariajaona/vectorizeo/main/install.sh | bash
+```
+
+This installs `vectorizeo` and `vectorizeo-gui` into `~/.local/bin`, adds a desktop entry and shell completions. Set `VECTORIZEO_VERSION=v0.1.0` to pin a release, or run it with `bash -s -- --uninstall` to remove everything.
+
+**Portable packages**: `vectorizeo-x86_64-linux.tar.gz` and `vectorizeo-x86_64-windows.zip` on the [releases page](https://github.com/rajaomariajaona/vectorizeo/releases). Unpack anywhere and run; nothing else is needed.
+
+**Releasing**: bump the version in the crates' `Cargo.toml`, then `git tag v0.1.0 && git push --tags`. The release workflow builds both packages and publishes them with a `SHA256SUMS` file.
+
 ## Usage
 
 ```sh
