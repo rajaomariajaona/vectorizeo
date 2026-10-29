@@ -1,0 +1,362 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   viewBox="0 0 256 256"
+   version="1.1"
+   id="svg45"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg"
+   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+   xmlns:cc="http://creativecommons.org/ns#"
+   xmlns:dc="http://purl.org/dc/elements/1.1/">
+  <defs
+     id="defs45">
+    <clipPath
+       clipPathUnits="userSpaceOnUse"
+       id="clipPath51">
+      <path
+         d="M 124.70268,104.01582 89.337783,40.280943 h -56 L 124.73586,217.86269 c 2.70861,-5.10808 4.5872,-8.71855 7.10502,-13.80848 0,-37.33164 0.30863,-113.366917 0.30863,-113.366917 z"
+         id="path51"
+         style="fill:none;fill-opacity:1;stroke:#ffffff;stroke-width:0.2;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1" />
+    </clipPath>
+  </defs>
+  <title
+     id="title1">Vectorizeo mark</title>
+  <g
+     fill="#fff"
+     id="g45">
+    <path
+       d="M 124.69191,104.03787 160,40 h 56 l -91.26552,177.88475 c -2.70861,-5.10808 -4.70541,-8.91093 -7.22323,-14.00086 0,-37.33164 0.0211,-112.841654 0.0211,-112.841654 z"
+       id="path1"
+       style="fill:#ffffff;fill-opacity:1;stroke:#ffffff;stroke-width:0.1;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1" />
+    <g
+       id="g2"
+       style="display:inline"
+       clip-path="url(#clipPath51)">
+      <rect
+         x="38"
+         y="40"
+         width="4.9000001"
+         height="4.9000001"
+         id="rect1" />
+      <rect
+         x="49"
+         y="40"
+         width="4.9000001"
+         height="4.9000001"
+         id="rect2" />
+      <rect
+         x="60.099998"
+         y="40"
+         width="5"
+         height="5"
+         id="rect3" />
+      <rect
+         x="71.199997"
+         y="40"
+         width="5.5"
+         height="5.5"
+         id="rect4" />
+      <rect
+         x="82.400002"
+         y="40"
+         width="6"
+         height="6"
+         id="rect5" />
+      <rect
+         x="49"
+         y="51"
+         width="4.9000001"
+         height="4.9000001"
+         id="rect6" />
+      <rect
+         x="39"
+         y="50.785763"
+         width="4.9000001"
+         height="4.9000001"
+         id="rect6-7"
+         style="display:inline" />
+      <rect
+         x="60.200001"
+         y="51"
+         width="5.4000001"
+         height="5.4000001"
+         id="rect7" />
+      <rect
+         x="71.300003"
+         y="51"
+         width="5.9000001"
+         height="5.9000001"
+         id="rect8" />
+      <rect
+         x="82.5"
+         y="51"
+         width="6.3000002"
+         height="6.3000002"
+         id="rect9" />
+      <rect
+         x="93.599998"
+         y="51"
+         width="6.8000002"
+         height="6.8000002"
+         id="rect10" />
+      <rect
+         x="49.200001"
+         y="62"
+         width="5.3000002"
+         height="5.3000002"
+         id="rect11" />
+      <rect
+         x="60.299999"
+         y="62"
+         width="5.8000002"
+         height="5.8000002"
+         id="rect12" />
+      <rect
+         x="71.400002"
+         y="62"
+         width="6.1999998"
+         height="6.1999998"
+         id="rect13" />
+      <rect
+         x="82.599998"
+         y="62"
+         width="6.6999998"
+         height="6.6999998"
+         id="rect14" />
+      <rect
+         x="93.699997"
+         y="62"
+         width="7.0999999"
+         height="7.0999999"
+         id="rect15" />
+      <rect
+         x="60.400002"
+         y="73"
+         width="6.1999998"
+         height="6.1999998"
+         id="rect16" />
+      <rect
+         x="71.599998"
+         y="73"
+         width="6.5999999"
+         height="6.5999999"
+         id="rect17" />
+      <rect
+         x="82.699997"
+         y="73"
+         width="7"
+         height="7"
+         id="rect18" />
+      <rect
+         x="93.800003"
+         y="73"
+         width="7.4000001"
+         height="7.4000001"
+         id="rect19" />
+      <rect
+         x="104.9"
+         y="73"
+         width="7.8000002"
+         height="7.8000002"
+         id="rect20" />
+      <rect
+         x="60.5"
+         y="84"
+         width="6.5"
+         height="6.5"
+         id="rect21" />
+      <rect
+         x="71.699997"
+         y="84"
+         width="6.9000001"
+         height="6.9000001"
+         id="rect22" />
+      <rect
+         x="82.800003"
+         y="84"
+         width="7.3000002"
+         height="7.3000002"
+         id="rect23" />
+      <rect
+         x="93.900002"
+         y="84"
+         width="7.5999999"
+         height="7.5999999"
+         id="rect24" />
+      <rect
+         x="105"
+         y="84"
+         width="8"
+         height="8"
+         id="rect25" />
+      <rect
+         x="71.800003"
+         y="95"
+         width="7.1999998"
+         height="7.1999998"
+         id="rect26" />
+      <rect
+         x="82.900002"
+         y="95"
+         width="7.5999999"
+         height="7.5999999"
+         id="rect27" />
+      <rect
+         x="94"
+         y="95"
+         width="7.9000001"
+         height="7.9000001"
+         id="rect28" />
+      <rect
+         x="105.1"
+         y="95"
+         width="8.3000002"
+         height="8.3000002"
+         id="rect29" />
+      <rect
+         x="71.900002"
+         y="106"
+         width="7.5999999"
+         height="7.5999999"
+         id="rect30" />
+      <rect
+         x="83"
+         y="106"
+         width="7.9000001"
+         height="7.9000001"
+         id="rect31" />
+      <rect
+         x="94.099998"
+         y="106"
+         width="8.1999998"
+         height="8.1999998"
+         id="rect32" />
+      <rect
+         x="105.2"
+         y="106"
+         width="8.5"
+         height="8.5"
+         id="rect33" />
+      <rect
+         x="83.099998"
+         y="117"
+         width="8.1999998"
+         height="8.1999998"
+         id="rect34" />
+      <rect
+         x="94.199997"
+         y="117"
+         width="8.5"
+         height="8.5"
+         id="rect35" />
+      <rect
+         x="105.3"
+         y="117"
+         width="8.8000002"
+         height="8.8000002"
+         id="rect36" />
+      <rect
+         x="83.199997"
+         y="128"
+         width="8.5"
+         height="8.5"
+         id="rect37" />
+      <rect
+         x="94.300003"
+         y="128"
+         width="8.8000002"
+         height="8.8000002"
+         id="rect38" />
+      <rect
+         x="105.4"
+         y="128"
+         width="9"
+         height="9"
+         id="rect39" />
+      <rect
+         x="94.400002"
+         y="139"
+         width="9"
+         height="9"
+         id="rect40" />
+      <rect
+         x="105.4"
+         y="139"
+         width="9.3000002"
+         height="9.3000002"
+         id="rect41" />
+      <rect
+         x="94.5"
+         y="150"
+         width="9.3000002"
+         height="9.3000002"
+         id="rect42" />
+      <rect
+         x="105.5"
+         y="150"
+         width="9.5"
+         height="9.5"
+         id="rect43" />
+      <rect
+         x="105.6"
+         y="161"
+         width="9.8000002"
+         height="9.8000002"
+         id="rect44" />
+      <rect
+         x="105.7"
+         y="172"
+         width="10"
+         height="10"
+         id="rect45" />
+      <path
+         id="rect45-6"
+         d="m 106.80958,183.85731 8.81273,-0.0609 -0.2131,15.63192 c -8.54391,-15.47682 0.0637,0.018 -8.59963,-15.57103 z" />
+      <rect
+         x="71.554466"
+         y="117"
+         width="8.1999998"
+         height="8.1999998"
+         id="rect46" />
+      <rect
+         x="59.800003"
+         y="95"
+         width="7.1999998"
+         height="7.1999998"
+         id="rect47" />
+      <rect
+         x="82.551491"
+         y="139.15149"
+         width="9"
+         height="9"
+         id="rect48" />
+      <rect
+         x="48.551491"
+         y="72.848511"
+         width="6.1999998"
+         height="6.1999998"
+         id="rect49" />
+      <rect
+         x="93.599998"
+         y="161"
+         width="9.8000002"
+         height="9.8000002"
+         id="rect50" />
+      <rect
+         x="30"
+         y="40"
+         width="4.9000001"
+         height="4.9000001"
+         id="rect51" />
+    </g>
+  </g>
+  <metadata
+     id="metadata1">
+    <rdf:RDF>
+      <cc:Work
+         rdf:about="">
+        <dc:title>Vectorizeo mark</dc:title>
+      </cc:Work>
+    </rdf:RDF>
+  </metadata>
+</svg>

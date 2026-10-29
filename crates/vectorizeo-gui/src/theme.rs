@@ -214,19 +214,49 @@ pub fn caption(ui: &mut Ui, text: &str) {
     ui.label(RichText::new(text.to_uppercase()).size(10.5).color(t.muted).strong());
 }
 
-/// The app mark: an accent tile with a white node.
+/// The dissolving left arm of the logo, one convex polygon per (possibly cut) pixel, in the 256-unit
+/// space of `assets/logo-small.svg`: the cut with fewer, larger pixels that survives at toolbar size.
+const LOGO_PIXELS: [&[(f32, f32)]; 20] = [
+    &[(35.8, 45.1), (42.6, 45.1), (42.6, 54.1), (40.5, 54.1)],
+    &[(52.0, 44.9), (61.6, 44.9), (61.6, 54.4), (52.0, 54.4)],
+    &[(70.2, 44.4), (80.7, 44.4), (80.7, 54.9), (70.2, 54.9)],
+    &[(88.4, 43.9), (91.3, 43.9), (97.7, 55.4), (88.4, 55.4)],
+    &[(45.4, 63.7), (52.3, 63.7), (52.3, 72.9), (50.1, 72.9)],
+    &[(61.4, 63.2), (71.5, 63.2), (71.5, 73.3), (61.4, 73.3)],
+    &[(79.6, 62.8), (90.6, 62.8), (90.6, 73.8), (79.6, 73.8)],
+    &[(97.8, 62.4), (101.6, 62.4), (108.2, 74.2), (97.8, 74.2)],
+    &[(54.8, 82.0), (62.3, 82.0), (62.3, 91.9), (59.9, 91.9)],
+    &[(70.7, 81.6), (81.3, 81.6), (81.3, 92.3), (70.7, 92.3)],
+    &[(89.0, 81.2), (100.4, 81.2), (100.4, 92.7), (89.0, 92.7)],
+    &[(64.3, 100.3), (72.2, 100.3), (72.2, 110.9), (69.7, 110.9)],
+    &[(80.0, 100.0), (91.2, 100.0), (91.2, 111.2), (80.0, 111.2)],
+    &[(98.4, 99.7), (110.2, 99.7), (110.2, 111.5), (98.4, 111.5)],
+    &[(73.7, 118.7), (82.2, 118.7), (82.2, 129.9), (79.5, 129.9)],
+    &[(89.4, 118.4), (101.1, 118.4), (101.1, 130.2), (89.4, 130.2)],
+    &[(83.1, 137.0), (92.1, 137.0), (92.1, 148.9), (89.2, 148.9)],
+    &[(98.7, 136.8), (111.0, 136.8), (111.0, 149.1), (98.7, 149.1)],
+    &[(92.6, 155.3), (102.1, 155.3), (102.1, 167.9), (99.0, 167.9)],
+    &[(102.0, 173.7), (112.0, 173.7), (112.0, 186.9), (108.8, 186.9)],
+];
+
+/// The app mark: `assets/logo-small.svg` (a clean vector arm and a left arm dissolving into pixels)
+/// on an accent tile, painted as shapes so it stays crisp at any scale.
 pub fn logo(ui: &mut Ui) {
     let t = tokens(ui.ctx());
-    let (rect, _) = ui.allocate_exact_size(Vec2::splat(20.0), egui::Sense::hover());
+    let (rect, _) = ui.allocate_exact_size(Vec2::splat(26.0), egui::Sense::hover());
     let p = ui.painter();
-    p.rect_filled(rect, CornerRadius::same(6), t.accent);
-    let c = rect.center();
-    let d = 5.0;
-    p.add(egui::Shape::convex_polygon(
-        vec![c + egui::vec2(0.0, -d), c + egui::vec2(d, 0.0), c + egui::vec2(0.0, d), c + egui::vec2(-d, 0.0)],
-        t.on_accent,
-        Stroke::NONE,
-    ));
+    p.rect_filled(rect, CornerRadius::same(7), t.accent);
+    let scale = rect.width() * 0.74 / 183.0;
+    let at = |&(x, y): &(f32, f32)| rect.center() + egui::vec2((x - 124.7) * scale, (y - 129.0) * scale);
+    let poly = |pts: &[(f32, f32)]| {
+        p.add(egui::Shape::convex_polygon(pts.iter().map(at).collect(), t.on_accent, Stroke::NONE));
+    };
+    // The smooth arm, and the strip beside it that the pixels end against.
+    poly(&[(124.69, 104.04), (160.0, 40.0), (216.0, 40.0), (124.73, 217.88), (117.51, 203.88)]);
+    poly(&[(117.53, 91.04), (124.69, 104.04), (124.69, 203.88), (117.51, 203.88)]);
+    for pixel in LOGO_PIXELS {
+        poly(pixel);
+    }
 }
 
 /// A small pill, e.g. "Recommended".

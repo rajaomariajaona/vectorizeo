@@ -1,3 +1,10 @@
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/logo-white.svg">
+    <img src="assets/logo.svg" alt="Vectorizeo logo" width="120">
+  </picture>
+</p>
+
 # Vectorizeo
 
 Vectorizeo turns bitmap images (PNG, JPEG, BMP, GIF, TIFF) into clean vector graphics. It is written in Rust and comes as a command-line tool, a terminal wizard and a desktop/web GUI.

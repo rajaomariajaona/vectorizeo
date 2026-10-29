@@ -18,6 +18,7 @@ fn main() -> eframe::Result {
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_title("vectorizeo")
+            .with_icon(window_icon())
             .with_app_id("vectorizeo-gui")
             .with_inner_size([1280.0, 820.0])
             .with_min_inner_size([760.0, 480.0])
@@ -29,6 +30,16 @@ fn main() -> eframe::Result {
         ..Default::default()
     };
     eframe::run_native("vectorizeo", options, Box::new(|cc| Ok(Box::new(app::App::new(cc, input)))))
+}
+
+/// The window icon: `assets/icon.png` (the small-size logo on an accent tile).
+#[cfg(not(target_arch = "wasm32"))]
+fn window_icon() -> eframe::egui::IconData {
+    let img = image::load_from_memory(include_bytes!("../assets/icon.png"))
+        .expect("assets/icon.png is a valid PNG")
+        .into_rgba8();
+    let (width, height) = img.dimensions();
+    eframe::egui::IconData { rgba: img.into_raw(), width, height }
 }
 
 /// Web build (`trunk serve`): run in the `<canvas id="vectorizeo">` of `index.html`.
