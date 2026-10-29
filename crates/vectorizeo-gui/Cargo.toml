@@ -2,6 +2,7 @@
 name = "vectorizeo-gui"
 version = "0.1.0"
 edition = "2024"
+license = "GPL-3.0-or-later"
 # The other bin, vectorizeo-worker, is the web build's Web Worker.
 default-run = "vectorizeo-gui"
 description = "Desktop and web GUI for the vectorizeo bitmap-to-vector tracer"

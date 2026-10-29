@@ -17,6 +17,8 @@ Vectorizeo turns bitmap images (PNG, JPEG, BMP, GIF, TIFF) into clean vector gra
 - Fixed or automatically proposed palettes, transparency handling, shape modes (stacked, cut-outs, grouped).
 - GUI with live stage-by-stage results, manual segmentation editing and background removal. It also runs in the browser (WebAssembly).
 
+A web version is available at [vectorizeo.pages.dev](https://vectorizeo.pages.dev). It runs in WebAssembly inside the browser, so it will be slow on anything other than a PC; the desktop GUI is faster.
+
 ## Layout
 
 | crate | purpose |
@@ -66,3 +68,7 @@ cargo fmt --all
 ```
 
 The workspace uses Rust edition 2024.
+
+## License
+
+Vectorizeo is free software, released under the [GNU General Public License v3.0 or later](LICENSE).
