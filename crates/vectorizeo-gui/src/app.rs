@@ -85,6 +85,40 @@ struct Document {
     pending_render: Option<RenderKey>,
     /// Outlines of the removed shapes of a result at a Remove Background revision.
     removed: Option<(Arc<VecRun>, u64, Vec<Vec<[f64; 2]>>)>,
+    /// Bytes of the file Export would write, for a result, Remove Background revision and format.
+    size: Option<(SizeKey, usize)>,
+    /// Switch to the Result view once the first result is ready (until the view is picked).
+    follow: bool,
+    /// The result was saved at least once.
+    exported: bool,
+}
+
+/// What the export size depends on.
+#[derive(Clone)]
+struct SizeKey {
+    result: Arc<VecRun>,
+    revision: u64,
+    export: ExportOptions,
+    format: Format,
+}
+
+impl PartialEq for SizeKey {
+    fn eq(&self, o: &Self) -> bool {
+        Arc::ptr_eq(&self.result, &o.result)
+            && self.revision == o.revision
+            && self.export.mode == o.export.mode
+            && self.export.stroke == o.export.stroke
+            && self.format == o.format
+    }
+}
+
+/// The steps from an image to a vector file, shown in the top bar.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Step {
+    Open,
+    Adjust,
+    Review,
+    Export,
 }
 
 impl Document {
@@ -152,6 +186,8 @@ pub struct App {
     confirm: Option<Settings>,
     /// Files picked or dropped in the browser (read asynchronously).
     picked: (Sender<Source>, Receiver<Source>),
+    /// The keyboard shortcuts window is open.
+    shortcuts: bool,
 }
 
 /// Textures keep pixels sharp when zoomed in and smooth when zoomed out.
@@ -200,6 +236,7 @@ impl App {
             export_format: Format::Svg,
             confirm: None,
             picked,
+            shortcuts: false,
         };
         if let Some(path) = input {
             app.open(Source { path, bytes: None });
@@ -240,6 +277,9 @@ impl App {
             result_tex: None,
             pending_render: None,
             removed: None,
+            size: None,
+            follow: true,
+            exported: false,
         });
     }
 
@@ -310,6 +350,9 @@ impl App {
                 }
             });
             self.toast = Some((format!("Downloaded {name}"), true, Instant::now()));
+            if let Some(doc) = &mut self.doc {
+                doc.exported = true;
+            }
         }
         #[cfg(not(target_arch = "wasm32"))]
         self.save_native(format, &stem.into_owned());
@@ -334,6 +377,11 @@ impl App {
             Ok(()) => (format!("Saved {}", path.display()), true),
             Err(e) => (format!("Cannot write {}: {e}", path.display()), false),
         };
+        if toast.1
+            && let Some(doc) = &mut self.doc
+        {
+            doc.exported = true;
+        }
         self.toast = Some((toast.0, toast.1, Instant::now()));
     }
 
@@ -394,6 +442,12 @@ impl App {
             self.cancel();
         }
         if ctx.egui_wants_keyboard_input() || self.confirm.is_some() {
+            return;
+        }
+        if ctx.input(|i| i.key_pressed(Key::Questionmark) || i.key_pressed(Key::F1)) {
+            self.shortcuts = !self.shortcuts;
+        }
+        if self.shortcuts {
             return;
         }
         let Some(doc) = &mut self.doc else { return };
@@ -492,6 +546,23 @@ impl App {
                     .collect();
                 doc.removed = Some((r.clone(), rev, lines));
             }
+            let key = SizeKey {
+                result: r.clone(),
+                revision: rev,
+                export: doc.session.save_options(),
+                format: self.export_format,
+            };
+            if !doc.size.as_ref().is_some_and(|(k, _)| *k == key) {
+                let bytes = doc.session.export(key.format).map_or(0, |s| s.len());
+                doc.size = Some((key, bytes));
+            }
+            // Show the first result once it is ready, unless a view was picked meanwhile.
+            if doc.follow {
+                doc.follow = false;
+                if self.view == View::Input {
+                    self.view = View::Result;
+                }
+            }
         }
     }
 
@@ -583,6 +654,8 @@ impl App {
                         let name = doc.path.file_name().unwrap_or_default().to_string_lossy();
                         ui.label(RichText::new(name).color(t.muted));
                     }
+                    ui.add_space(12.0);
+                    self.steps(ui);
                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                         let label = match (self.export_pending, self.export_format) {
                             (true, _) => "Finishing…",
@@ -636,6 +709,115 @@ impl App {
         );
     }
 
+    /// The step the open image is at.
+    fn step(&self) -> Step {
+        match &self.doc {
+            None => Step::Open,
+            Some(d) if d.exported => Step::Export,
+            Some(d) if d.session.result().is_some() => Step::Review,
+            Some(_) => Step::Adjust,
+        }
+    }
+
+    /// Open › Adjust › Review › Export: done steps ticked, the current one highlighted; Open,
+    /// Review and Export also act when clicked.
+    fn steps(&mut self, ui: &mut Ui) {
+        let t = theme::tokens(ui.ctx());
+        let cur = self.step();
+        let done = |s: Step| (s as u8) < (cur as u8) || (s == Step::Export && cur == Step::Export);
+        ui.spacing_mut().item_spacing.x = 4.0;
+        for (i, (step, label, tip)) in [
+            (Step::Open, "Open", "Open or drop an image (Ctrl+O)"),
+            (Step::Adjust, "Adjust", "Pick the image type, detail level and colours in the panel on the right"),
+            (Step::Review, "Review", "Check the result (R); Compare (C) puts the input next to it"),
+            (Step::Export, "Export", "Save the result as SVG or EPS (Ctrl+S)"),
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            if i > 0 {
+                ui.label(RichText::new("›").color(t.muted));
+            }
+            let (mark, color) = match (done(step), step == cur) {
+                (true, _) => ("✔".to_string(), t.accent),
+                (false, true) => ((i + 1).to_string(), t.text),
+                (false, false) => ((i + 1).to_string(), t.muted),
+            };
+            let text = RichText::new(format!("{mark} {label}")).color(color);
+            let text = if step == cur && !done(step) { text.strong() } else { text };
+            let r = ui.add(egui::Button::new(text).frame_when_inactive(false)).on_hover_text(tip);
+            if r.clicked() {
+                match step {
+                    Step::Open => self.open_dialog(ui.ctx()),
+                    Step::Adjust => {}
+                    Step::Review if self.doc.is_some() => self.view = View::Result,
+                    Step::Export if self.doc.is_some() => self.export(),
+                    _ => {}
+                }
+            }
+        }
+    }
+
+    /// Every keyboard shortcut, opened with ? or F1.
+    fn shortcuts_window(&mut self, ctx: &egui::Context) {
+        if !self.shortcuts {
+            return;
+        }
+        let t = theme::tokens(ctx);
+        let groups: [(&str, &[(&str, &str)]); 3] = [
+            (
+                "General",
+                &[
+                    ("Ctrl+O", "Open an image"),
+                    ("Ctrl+S", "Export the result"),
+                    ("Esc", "Cancel the running step"),
+                    ("? or F1", "Show these shortcuts"),
+                ],
+            ),
+            (
+                "View",
+                &[
+                    ("I / S / R", "Input, Segments, Result view"),
+                    ("C", "Compare with the input"),
+                    ("F", "Fit to window (also double-click)"),
+                    ("1", "Actual pixels"),
+                    ("E", "Edit mode"),
+                ],
+            ),
+            (
+                "Edit mode",
+                &[
+                    ("Z / Y / T", "Undo, redo, revert"),
+                    ("A", "Pan (hold Shift to pan for a moment)"),
+                    ("D", "Zap a segment / remove a shape"),
+                    ("F", "Fill"),
+                    ("X", "Pencil"),
+                    ("C", "Pick a colour"),
+                ],
+            ),
+        ];
+        let modal = egui::Modal::new(egui::Id::new("shortcuts")).show(ctx, |ui| {
+            ui.set_width(380.0);
+            ui.label(RichText::new("Keyboard shortcuts").strong().size(15.0));
+            for (title, keys) in groups {
+                ui.add_space(8.0);
+                caption(ui, title);
+                egui::Grid::new(title).num_columns(2).spacing(vec2(16.0, 4.0)).show(ui, |ui| {
+                    for (key, what) in keys {
+                        ui.label(RichText::new(*key).monospace().color(t.accent));
+                        ui.label(*what);
+                        ui.end_row();
+                    }
+                });
+            }
+            ui.add_space(8.0);
+            ui.button("Close").clicked()
+        });
+        if modal.inner || modal.should_close() {
+            self.shortcuts = false;
+        }
+    }
+
     fn side_panel(&mut self, ui: &mut Ui) {
         let t = theme::tokens(ui.ctx());
         self.hover = None;
@@ -684,10 +866,14 @@ impl App {
                 ui.horizontal(|ui| {
                     self.progress(ui);
                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                        ui.spacing_mut().item_spacing.x = 4.0;
+                        if ui.small_button("?").on_hover_text("Keyboard shortcuts (?, F1)").clicked() {
+                            self.shortcuts = true;
+                        }
                         if self.doc.is_none() {
                             return;
                         }
-                        ui.spacing_mut().item_spacing.x = 4.0;
+                        ui.add_space(12.0);
                         if ui.small_button("Fit").on_hover_text("Fit to window (F, double-click)").clicked() {
                             self.canvas.fit();
                         }
@@ -743,7 +929,15 @@ impl App {
         } else if let Some(r) = doc.session.result() {
             let segments = doc.session.segmentation().map_or(0, |s| s.seg.segments.len());
             let curves = r.v.curves.as_ref().map_or(0, |c| c.fits.len());
-            ui.label(RichText::new(format!("{segments} segments · {curves} curves")).color(t.muted));
+            let size = match &doc.size {
+                Some((k, bytes)) if Arc::ptr_eq(&k.result, r) => {
+                    let ext = k.format.extension().to_uppercase();
+                    format!(" · {} {ext}", file_size(*bytes))
+                }
+                _ => String::new(),
+            };
+            ui.label(RichText::new(format!("{segments} segments · {curves} curves{size}")).color(t.muted))
+                .on_hover_text("Size of the file Export saves");
         }
     }
 
@@ -839,8 +1033,28 @@ impl App {
                 } else if accent_button(ui, "Open image…").clicked() {
                     self.open_dialog(ui.ctx());
                 }
+                ui.add_space(14.0);
+                ui.label(
+                    RichText::new("The settings are picked for the image; adjust them on the right, then export.")
+                        .size(11.5)
+                        .color(t.muted),
+                );
             });
         });
+        ui.scope_builder(egui::UiBuilder::new().max_rect(zone.translate(vec2(0.0, zone.height() + 12.0))), |ui| {
+            ui.vertical_centered(|ui| {
+                ui.label(RichText::new("Press ? for keyboard shortcuts").size(11.5).color(t.muted));
+            });
+        });
+    }
+}
+
+/// 840 B, 12.3 KB, 4.1 MB.
+fn file_size(bytes: usize) -> String {
+    match bytes {
+        b if b < 1000 => format!("{b} B"),
+        b if b < 1_000_000 => format!("{:.1} KB", b as f64 / 1e3),
+        b => format!("{:.1} MB", b as f64 / 1e6),
     }
 }
 
@@ -921,8 +1135,15 @@ impl eframe::App for App {
     fn ui(&mut self, ui: &mut Ui, _frame: &mut eframe::Frame) {
         let ctx = ui.ctx().clone();
         self.poll(&ctx);
+        let view = self.view;
         self.handle_input(&ctx);
         self.top_bar(ui);
+        // A view picked by hand stays.
+        if self.view != view
+            && let Some(doc) = &mut self.doc
+        {
+            doc.follow = false;
+        }
         self.status_bar(ui);
         self.side_panel(ui);
         self.central(ui);
@@ -934,6 +1155,7 @@ impl eframe::App for App {
         }
         self.show_toast(&ctx);
         self.confirm_dialog(&ctx);
+        self.shortcuts_window(&ctx);
     }
 
     fn clear_color(&self, _visuals: &egui::Visuals) -> [f32; 4] {
