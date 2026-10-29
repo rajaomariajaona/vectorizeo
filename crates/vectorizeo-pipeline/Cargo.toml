@@ -1,0 +1,18 @@
+[package]
+name = "vectorizeo-pipeline"
+version = "0.1.0"
+edition = "2024"
+description = "Pipeline steps and GUI-flow state shared by the vectorizeo CLI, wizard and GUI"
+
+[dependencies]
+vectorizeo-core = { path = "../vectorizeo-core" }
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "bmp", "gif", "tiff"] }
+resvg = { version = "0.47", default-features = false }
+serde = { version = "1", features = ["derive", "rc"], optional = true }
+
+[features]
+# Serialize jobs and results (the web GUI runs them in a Web Worker).
+serde = ["dep:serde", "vectorizeo-core/serde"]
+
+[dev-dependencies]
+postcard = { version = "1", default-features = false, features = ["alloc"] }
