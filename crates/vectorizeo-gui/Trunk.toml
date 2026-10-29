@@ -1,0 +1,8 @@
+# Web build of vectorizeo-gui: `trunk serve` (dev server) or `trunk build --release` (static files in dist/).
+[build]
+target = "index.html"
+dist = "dist"
+
+[serve]
+addresses = ["127.0.0.1"]
+port = 8080
