@@ -1,0 +1,3 @@
+[workspace]
+resolver = "3"
+members = ["crates/vectorizeo-core", "crates/vectorizeo-pipeline", "crates/vectorizeo-cli", "crates/vectorizeo-gui"]
